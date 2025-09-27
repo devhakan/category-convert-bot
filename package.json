@@ -1,0 +1,19 @@
+{
+  "name": "wikipedia-category-checker",
+  "version": "1.0.0",
+  "description": "İngilizce Wikipedia kategorisindeki maddelerin Türkçe Wikipedia'da eksik olanlarını bulan CLI tool",
+  "main": "index.js",
+  "bin": {
+    "wiki-check": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "commander": "^11.0.0"
+  },
+  "keywords": ["wikipedia", "wikidata", "cli", "turkish"],
+  "author": "",
+  "license": "MIT"
+}
