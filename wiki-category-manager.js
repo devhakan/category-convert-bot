@@ -112,36 +112,74 @@ class WikiCategoryManager {
   }
 
   async getEnglishCategoryMembers(categoryName) {
-    const params = {
-      action: 'query',
-      list: 'categorymembers',
-      cmtitle: `Category:${categoryName}`,
-      cmlimit: 500,
-      format: 'json'
-    };
+    let allMembers = [];
+    let cmcontinue = null;
 
-    const response = await axios.get(this.enWikiAPI, { params });
-    const members = response.data.query?.categorymembers || [];
-    
-    return members.map(member => ({
-      title: member.title,
-      pageid: member.pageid
-    }));
+    do {
+      const params = {
+        action: 'query',
+        list: 'categorymembers',
+        cmtitle: `Category:${categoryName}`,
+        cmlimit: 500,
+        format: 'json'
+      };
+
+      if (cmcontinue) {
+        params.cmcontinue = cmcontinue;
+      }
+
+      const response = await axios.get(this.enWikiAPI, { params });
+      const data = response.data;
+      const members = data.query?.categorymembers || [];
+      
+      allMembers = allMembers.concat(members.map(member => ({
+        title: member.title,
+        pageid: member.pageid
+      })));
+
+      cmcontinue = data.continue?.cmcontinue;
+      
+      // Rate limiting
+      if (cmcontinue) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } while (cmcontinue);
+
+    return allMembers;
   }
 
   async getTurkishCategoryMembers(categoryName) {
-    const params = {
-      action: 'query',
-      list: 'categorymembers',
-      cmtitle: `Kategori:${categoryName}`,
-      cmlimit: 500,
-      format: 'json'
-    };
+    let allMembers = [];
+    let cmcontinue = null;
 
-    const response = await axios.get(this.trWikiAPI, { params });
-    const members = response.data.query?.categorymembers || [];
-    
-    return new Set(members.map(member => member.title));
+    do {
+      const params = {
+        action: 'query',
+        list: 'categorymembers',
+        cmtitle: `Kategori:${categoryName}`,
+        cmlimit: 500,
+        format: 'json'
+      };
+
+      if (cmcontinue) {
+        params.cmcontinue = cmcontinue;
+      }
+
+      const response = await axios.get(this.trWikiAPI, { params });
+      const data = response.data;
+      const members = data.query?.categorymembers || [];
+      
+      allMembers = allMembers.concat(members);
+
+      cmcontinue = data.continue?.cmcontinue;
+      
+      // Rate limiting
+      if (cmcontinue) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } while (cmcontinue);
+
+    return new Set(allMembers.map(member => member.title));
   }
 
   async getTurkishWikidataId(trTitle) {
@@ -246,11 +284,17 @@ class WikiCategoryManager {
     const turkishArticles = await this.getTurkishCategoryMembers(turkishCategoryName);
     
     console.log(`📊 İngilizce: ${englishArticles.length} madde | Türkçe: ${turkishArticles.size} madde`);
+    console.log(`🔄 Eksik maddeler kontrol ediliyor...`);
     
     const missingArticles = [];
     
     for (let i = 0; i < englishArticles.length; i++) {
       const article = englishArticles[i];
+      
+      // Progress göster
+      if (i % 10 === 0 || i === englishArticles.length - 1) {
+        process.stdout.write(`\r   📊 İlerleme: ${i + 1}/${englishArticles.length} (${Math.round((i + 1) / englishArticles.length * 100)}%)`);
+      }
       
       const wikidataId = await this.getWikidataId(article.title);
       if (!wikidataId) continue;
@@ -269,6 +313,7 @@ class WikiCategoryManager {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
+    console.log(`\n✅ Analiz tamamlandı: ${missingArticles.length} eksik madde bulundu`);
     return missingArticles;
   }
 
