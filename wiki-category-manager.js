@@ -397,23 +397,26 @@ class WikiCategoryManager {
       
       if (missingArticles.length === 0) {
         console.log('✅ Tüm maddeler kategoride mevcut!');
-        return;
+        return { successCount: 0, errorCount: 0 };
       }
 
       console.log(`\n🎯 ${missingArticles.length} maddeye kategori eklenecek`);
       
-      console.log('🔐 Wikipedia\'ya giriş yapılıyor...');
-      const configLoaded = await this.loadConfig();
-      if (!configLoaded) return;
+      // İlk kategoride giriş yap, sonrakilerde tekrar giriş yapma
+      if (!this.editToken) {
+        console.log('🔐 Wikipedia\'ya giriş yapılıyor...');
+        const configLoaded = await this.loadConfig();
+        if (!configLoaded) return { successCount: 0, errorCount: 0 };
 
-      const loginSuccess = await this.login();
-      if (!loginSuccess) {
-        console.error('❌ Giriş başarısız');
-        return;
+        const loginSuccess = await this.login();
+        if (!loginSuccess) {
+          console.error('❌ Giriş başarısız');
+          return { successCount: 0, errorCount: 0 };
+        }
+
+        await this.getEditToken();
+        console.log('✅ Bot hazır!\n');
       }
-
-      await this.getEditToken();
-      console.log('✅ Bot hazır!\n');
 
       let successCount = 0;
       let errorCount = 0;
@@ -445,8 +448,11 @@ class WikiCategoryManager {
       console.log(`   📊 Toplam: ${missingArticles.length}`);
       console.log('='.repeat(50));
 
+      return { successCount, errorCount };
+
     } catch (error) {
       console.error('❌ İşlem hatası:', error.message);
+      return { successCount: 0, errorCount: 0 };
     }
   }
 }
@@ -455,10 +461,50 @@ program
   .name('wiki-category-manager')
   .description('Türkçe Wikipedia kategorilerini yönetir')
   .version('1.0.0')
-  .argument('<category>', 'Türkçe Wikipedia kategori adı (Kategori: öneki olmadan)')
-  .action(async (categoryName) => {
+  .argument('<categories...>', 'Türkçe Wikipedia kategori adları (Kategori: öneki olmadan, boşlukla ayırın)')
+  .action(async (categoryNames) => {
     const manager = new WikiCategoryManager();
-    await manager.processCategory(categoryName);
+    
+    console.log(`🎯 ${categoryNames.length} kategori işlenecek\n`);
+    
+    let totalProcessed = 0;
+    let totalSuccess = 0;
+    let totalErrors = 0;
+    
+    for (let i = 0; i < categoryNames.length; i++) {
+      const categoryName = categoryNames[i];
+      
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`📂 KATEGORİ ${i + 1}/${categoryNames.length}: ${categoryName}`);
+      console.log(`${'='.repeat(60)}`);
+      
+      try {
+        const result = await manager.processCategory(categoryName);
+        if (result) {
+          totalSuccess += result.successCount || 0;
+          totalErrors += result.errorCount || 0;
+          totalProcessed += (result.successCount || 0) + (result.errorCount || 0);
+        }
+        
+        // Kategoriler arası bekleme
+        if (i < categoryNames.length - 1) {
+          console.log('\n⏳ Sonraki kategoriye geçiliyor...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+      } catch (error) {
+        console.error(`❌ ${categoryName} kategorisi işlenirken hata:`, error.message);
+      }
+    }
+    
+    // Genel özet
+    console.log(`\n${'='.repeat(60)}`);
+    console.log('📋 GENEL ÖZET:');
+    console.log(`   📂 İşlenen kategori: ${categoryNames.length}`);
+    console.log(`   📊 Toplam işlenen madde: ${totalProcessed}`);
+    console.log(`   ✅ Toplam başarılı: ${totalSuccess}`);
+    console.log(`   ❌ Toplam hatalı: ${totalErrors}`);
+    console.log(`${'='.repeat(60)}`);
   });
 
 program.parse();
