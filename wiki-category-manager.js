@@ -88,8 +88,13 @@ class WikiCategoryManager {
         this.cookies = setCookies.map(cookie => cookie.split(';')[0]).join('; ');
       }
       return true;
+    } else {
+      console.error('❌ Giriş hatası:', result?.result || 'Bilinmeyen hata');
+      if (result?.reason) {
+        console.error('📝 Sebep:', result.reason);
+      }
+      return false;
     }
-    return false;
   }
 
   async getEditToken() {
